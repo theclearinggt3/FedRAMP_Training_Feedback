@@ -1,0 +1,143 @@
+---
+title: "Training Survey Feedback Analysis"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+#If packages are not installed on your computer, need to uncomment and install the following packages. 
+#install.packages("readxl")
+#install.packages("readr")
+#install.packages("tidytext")
+#install.packages("tidyverse")
+#install.packages("ggplot2")
+#install.packages("igraph")
+#install.packages("dplyr")
+#install.packages("plyr")
+#install.packages("sqldf")
+
+library(readxl)
+library(readr)
+library(tidytext)
+library(tidyverse)
+library(ggplot2)
+library(igraph)
+library(dplyr)
+library(plyr)
+library(sqldf)
+```
+
+##Loading Data    
+   
+```{r}
+library(readxl)
+#Julia Smadja's working directory, what's in quotation marks must changed
+Training_Feedback <- read_excel("~/Desktop/GitHub/FedRAMP_Training_Feedback/FedRAMP Training Feedback - new platform (Responses).xlsx")
+head(Training_Feedback) #seeing the first five rows of the data 
+Training_Feedback
+```
+
+##Seperating Data     
+   
+This data frame has categorical and text data. To analyze individual questions regarding the overall sentiment of the users, we must separate the questions into different dataframes.   
+    
+```{r}
+#Quantitative Data 
+
+Quantitative_Analysis <- Training_Feedback %>%
+  select(`Which FedRAMP Training course did you take?`, 
+         `Please rate your overall experience with the training.`, 
+         `How relevant and helpful was the training content?`, 
+         `How likely are you to recommend this training?`, 
+         `Please rate your overall experience using the Adobe training platform.`) %>%
+  mutate(`Which FedRAMP Training course did you take?` = as.factor(`Which FedRAMP Training course did you take?`))
+
+Quantitative_Analysis
+#class(Quantitative_Analysis$`Which FedRAMP Training course did you take?`)
+#levels(Quantitative_Analysis$`Which FedRAMP Training course did you take?`)
+
+#Qualitative Data  
+
+Additional_Info <- Training_Feedback %>% 
+  select(`Which FedRAMP Training course did you take?`, 
+         `What other information would be helpful to include in the training?`) 
+  #mutate(`Which FedRAMP Training course did you take?` = as.factor(`Which FedRAMP Training course did you take?`))
+
+Additional_Info
+```    
+    
+##Quantitative Analysis    
+    
+```{r}
+Overall_Average_Sentiment <- Quantitative_Analysis %>%
+  summarise(`Overall_Experience_Training` = mean(`Please rate your overall experience with the training.`), 
+            `Relevant_Helpful_Content` = mean(`How relevant and helpful was the training content?`), 
+            `Likely_to_Recommend` = mean(`How likely are you to recommend this training?`), 
+            `Overall_Experience_Platform` = mean(`Please rate your overall experience using the Adobe training platform.`))
+
+Overall_Average_Sentiment
+
+Average_Sentiment_Course <- Quantitative_Analysis %>%
+  group_by(`Which FedRAMP Training course did you take?`) %>%
+  summarise(`Overall_Experience_Training` = mean(`Please rate your overall experience with the training.`), 
+            `Relevant_Helpful_Content` = mean(`How relevant and helpful was the training content?`), 
+            `Likely_to_Recommend` = mean(`How likely are you to recommend this training?`), 
+            `Overall_Experience_Platform` = mean(`Please rate your overall experience using the Adobe training platform.`))
+
+Average_Sentiment_Course
+  
+```
+   
+      
+##Qualitative Analysis    
+    
+```{r}
+Additional_Info_Analysis <- Additional_Info %>% 
+  select(`comment` = `What other information would be helpful to include in the training?`) %>%
+  na.omit()
+
+Additional_Info_Analysis <- data.frame(line = 1:nrow(Additional_Info_Analysis), 
+                                       comment = Additional_Info_Analysis$comment) %>%
+                            mutate_if(is.factor, as.character)
+
+Additional_Info_Analysis
+```
+
+**Word Count Analysis**
+```{r}
+Additional_Info_Word_Analysis <- Additional_Info_Analysis %>%
+  unnest_tokens(word, comment)
+
+data(stop_words)
+stop_words
+
+Additional_Info_Word_Analysis <- Additional_Info_Word_Analysis %>%
+  anti_join(stop_words, by = "word")
+
+Additional_Info_Word_Analysis
+
+Additional_Info_Word_Analysis <- Additional_Info_Word_Analysis %>%
+  select("words" = "word", everything()) %>%
+  count("words") %>%
+  arrange(desc(freq))
+
+#Word Bar Visual 
+#Additional_Info_Word_Analysis <- Additional_Info_Word_Analysis %>%
+  #mutate(word = reorder("word", freq)) %>%
+  #ggplot(aes(words, freq)) + 
+  #geom_col() + 
+  #xlab(NULL) + 
+  #coord_flip()
+
+Additional_Info_Word_Analysis
+```    
+   
+**Word Sentiment Analysis**   
+```{r}
+get_sentiments("afinn")
+get_sentiments("bing")
+get_sentiments("nrc")
+```
+
+
